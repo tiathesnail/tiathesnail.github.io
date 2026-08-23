@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Weather</title>
+<style>
+  :root{
+    --bg-top:#0d1b2a;
+    --bg-bottom:#1b2a41;
+    --card:#182b40;
+    --line:#2b415e;
+    --text:#eaf1fb;
+    --dim:#9db1c9;
+    --accent:#ffb64c;   /* sunrise/sunset amber */
+    --accent2:#7fd1ff;  /* moon/night blue */
+    --rain:#5aa9e6;
+    --bad:#ff8a80;
+    --radius:14px;
+  }
+  * { box-sizing: border-box; }
+  html,body{
+    margin:0; padding:0;
+    background: linear-gradient(180deg, var(--bg-top), var(--bg-bottom) 60%);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    min-height:100vh;
+  }
+  .wrap{
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 18px 16px 40px;
+  }
+  header{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    margin-bottom: 14px;
+  }
+  h1{
+    font-size: 1.15rem;
+    letter-spacing: 0.02em;
+    margin: 0;
+    font-weight: 700;
+  }
+  h1 span{ color: var(--accent); }
+  .subtitle{
+    font-size: 0.75rem;
+    color: var(--dim);
+    margin-top: 2px;
+  }
+  button{
+    font-family: inherit;
+    cursor: pointer;
+  }
+  .locate-btn{
+    background: var(--accent2);
+    color: #052034;
+    border: none;
+    border-radius: 999px;
+    padding: 8px 14px;
+    font-size: 0.8rem;
+    font-weight: 700;
+  }
+  .locate-btn:disabled{ opacity: 0.6; }
+
+  .status{
+    font-size: 0.85rem;
+    color: var(--dim);
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    margin-bottom: 14px;
+    display:none;
+  }
+  .status.show{ display:block; }
+  .status.error{ color: var(--bad); border-color: rgba(255,138,128,0.4); }
+
+  .manual{
+    display:none;
+    margin-top:10px;
+  }
+  .manual.show{ display:block; }
+  .manual-row{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+  }
+  .manual input{
+    flex:1;
+    min-width: 110px;
+    background:#0f2032;
+    border:1px solid var(--line);
+    color:var(--text);
+    border-radius:8px;
+    padding:8px 10px;
+    font-size:0.85rem;
+  }
+  .manual button{
+    background: var(--accent);
+    border:none;
+    border-radius:8px;
+    padding:8px 12px;
+    font-weight:700;
+    color:#2b1900;
+    font-size:0.85rem;
+  }
+  .mode-switch{
+    display:flex;
+    gap:6px;
+    margin-bottom:10px;
+  }
+  .mode-switch button{
+    flex:1;
+    background:#0f2032;
+    border:1px solid var(--line);
+    color:var(--dim);
+    border-radius:8px;
+    padding:6px;
+    font-size:0.75rem;
+    font-weight:700;
+  }
+  .mode-switch button.active{
+    background: var(--accent2);
+    color:#052034;
+    border-color: var(--accent2);
+  }
+  .mode-panel{ display:none; }
+  .mode-panel.active{ display:block; }
+  .city-results{
+    margin-top:8px;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .city-result{
+    text-align:left;
+    background:#0f2032;
+    border:1px solid var(--line);
+    color: var(--text);
+    border-radius:8px;
+    padding:9px 12px;
+    font-size:0.85rem;
+    width:100%;
+  }
+  .city-result .cr-place{ font-weight:600; }
+  .city-result .cr-detail{ font-size:0.72rem; color:var(--line); margin-top:2px; }
+  .city-hint{
+    font-size:0.72rem;
+    color:var(--dim);
+    margin-top:6px;
+  }
+
+  section{
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 14px;
+  }
+  section h2{
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--dim);
+    margin: 0 0 12px 0;
+    font-weight: 700;
+  }
+
+  /* current temp */
+  .now{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+  }
+  .now .temp{
+    font-size: 3rem;
+    font-weight: 200;
+    line-height: 1;
+  }
+  .now .temp small{ font-size: 1.4rem; font-weight: 300; color: var(--dim); }
+  .now .meta{ text-align:right; font-size:0.85rem; color:var(--dim); }
+  .now .place{ font-size:0.9rem; color: var(--text); margin-bottom:4px; }
+  .unit-toggle{
+    display:flex;
+    gap:6px;
+    margin-top:10px;
+  }
+  .unit-toggle button{
+    flex:1;
+    background:#0f2032;
+    border:1px solid var(--line);
+    color:var(--dim);
+    border-radius:8px;
+    padding:6px;
+    font-size:0.8rem;
+    font-weight:700;
+  }
+  .unit-toggle button.active{
+    background: var(--accent);
+    color:#2b1900;
+    border-color: var(--accent);
+  }
+
+  /* rain hours */
+  .rain-row{
+    display:flex;
+    overflow-x:auto;
+    gap:10px;
+    padding-bottom:4px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .rain-hour{
+    flex: 0 0 auto;
+    width: 64px;
+    text-align:center;
+    background:#0f2032;
+    border-radius:10px;
+    padding:10px 6px;
+    border: 1px solid var(--line);
+  }
+  .rain-hour .t{ font-size:0.72rem; color:var(--dim); margin-bottom:6px; }
+  .rain-hour .p{ font-size:1rem; font-weight:700; color: var(--rain); }
+  .rain-hour .p.low{ color: var(--dim); }
+  .rain-summary{
+    margin-top:10px;
+    font-size:0.85rem;
+    color: var(--text);
+  }
+
+  /* sun */
+  .sun-row{
+    display:flex;
+    justify-content:space-between;
+    gap:12px;
+  }
+  .sun-box{
+    flex:1;
+    background:#0f2032;
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:12px;
+    text-align:center;
+  }
+  .sun-box .label{ font-size:0.7rem; color:var(--dim); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:6px;}
+  .sun-box .value{ font-size:1.15rem; font-weight:700; color: var(--accent); }
+  .sun-box .rel{ font-size:0.72rem; color:var(--dim); margin-top:4px; }
+
+  /* astronomy */
+  .moon-row{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    margin-bottom:14px;
+  }
+  .moon-icon{
+    width:56px;
+    height:56px;
+    flex: 0 0 auto;
+  }
+  .moon-info .phase-name{ font-weight:700; font-size:1rem; }
+  .moon-info .illum{ font-size:0.8rem; color:var(--dim); margin-top:2px; }
+
+  .planet-list{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+  .planet{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    background:#0f2032;
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:8px 12px;
+    font-size:0.85rem;
+  }
+  .planet .name{ font-weight:600; }
+  .planet .tag{
+    font-size:0.7rem;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:0.03em;
+  }
+  .tag.visible{ background: rgba(127,209,255,0.18); color: var(--accent2); }
+  .tag.daylight{ background: rgba(255,182,76,0.18); color: var(--accent); }
+  .tag.below{ background: rgba(157,177,201,0.14); color: var(--dim); }
+
+  footer{
+    text-align:center;
+    font-size:0.7rem;
+    color: var(--dim);
+    margin-top: 6px;
+  }
+  footer a{ color: var(--accent2); }
+
+  .skeleton{
+    opacity:0.35;
+  }
+  @media (prefers-reduced-motion: no-preference){
+    section{ transition: opacity 0.25s ease; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <h1>Sky<span>Check</span></h1>
+      <div class="subtitle">weather &amp; sky, right where you are</div>
+    </div>
+    <button class="locate-btn" id="locateBtn">Use my location</button>
+  </header>
+
+  <div class="status" id="status"></div>
+  <div class="manual" id="manualForm">
+    <div class="mode-switch">
+      <button id="modeCityBtn" class="active">Search city</button>
+      <button id="modeCoordBtn">Enter coordinates</button>
+    </div>
+
+    <div class="mode-panel active" id="cityPanel">
+      <div class="manual-row">
+        <input type="text" id="cityInput" placeholder="City name, e.g. Chicago" autocomplete="off" />
+        <button id="citySearchBtn">Search</button>
+      </div>
+      <div class="city-results" id="cityResults"></div>
+      <div class="city-hint" id="cityHint"></div>
+    </div>
+
+    <div class="mode-panel" id="coordPanel">
+      <div class="manual-row">
+        <input type="number" id="manLat" placeholder="Latitude" step="0.0001" />
+        <input type="number" id="manLon" placeholder="Longitude" step="0.0001" />
+        <button id="manSubmit">Go</button>
+      </div>
+    </div>
+  </div>
+
+  <section id="section-now" style="display:none;">
+    <h2>Current Temperature</h2>
+    <div class="now">
+      <div>
+        <div class="place" id="placeLabel">—</div>
+        <div class="temp" id="tempValue">--<small id="unitLabel">°C</small></div>
+      </div>
+      <div class="meta" id="tempMeta">—</div>
+    </div>
+    <div class="unit-toggle">
+      <button id="cBtn" class="active">°C</button>
+      <button id="fBtn">°F</button>
+    </div>
+  </section>
+
+  <section id="section-rain" style="display:none;">
+    <h2>Rain — Next Few Hours</h2>
+    <div class="rain-row" id="rainRow"></div>
+    <div class="rain-summary" id="rainSummary"></div>
+  </section>
+
+  <section id="section-sun" style="display:none;">
+    <h2>Sunrise &amp; Sunset</h2>
+    <div class="sun-row">
+      <div class="sun-box">
+        <div class="label">Next Sunrise</div>
+        <div class="value" id="sunriseValue">—</div>
+        <div class="rel" id="sunriseRel">—</div>
+      </div>
+      <div class="sun-box">
+        <div class="label">Next Sunset</div>
+        <div class="value" id="sunsetValue">—</div>
+        <div class="rel" id="sunsetRel">—</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="section-astro" style="display:none;">
+    <h2>Astronomy Tonight</h2>
+    <div class="moon-row">
+      <svg class="moon-icon" id="moonIcon" viewBox="0 0 100 100"></svg>
+      <div class="moon-info">
+        <div class="phase-name" id="moonPhaseName">—</div>
+        <div class="illum" id="moonIllum">—</div>
+      </div>
+    </div>
+    <div class="planet-list" id="planetList"></div>
+  </section>
+
+  <footer>
+    Weather data from <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a> ·
+    Sky positions computed locally with low-precision orbital formulas ·
+    Prototype for school assignment
+  </footer>
+
+</div>
+
+<script>
+(function(){
+
+  // ---------- small helpers ----------
+  const $ = (id) => document.getElementById(id);
+  const toRad = d => d * Math.PI / 180;
+  const toDeg = r => r * 180 / Math.PI;
+  const norm360 = d => { d = d % 360; return d < 0 ? d + 360 : d; };
+  const clamp = (v,lo,hi) => Math.max(lo, Math.min(hi, v));
+
+  function setStatus(msg, isError){
+    const el = $('status');
+    el.textContent = msg;
+    el.className = 'status show' + (isError ? ' error' : '');
+  }
+  function clearStatus(){
+    const el = $('status');
+    el.className = 'status';
+    el.textContent = '';
+  }
+  function showSections(){
+    ['section-now','section-rain','section-sun','section-astro'].forEach(id=>{
+      $(id).style.display = 'block';
+    });
+  }
+
+  // ================================================================
+  // ASTRONOMY ENGINE
+  // Low-precision planetary position formulas (heliocentric Keplerian
+  // elements, epoch 2000 Jan 0.0 UT), used to compute the Moon's phase
+  // and whether the naked-eye planets are currently above the horizon.
+  // Accuracy is on the order of arc-minutes -- plenty for "is it up
+  // tonight?", not for pointing a telescope.
+  // ================================================================
+
+  const ELEMENTS = {
+    sun:     {N0:0,        Nd:0,           i0:0,      id:0,           w0:282.9404, wd:4.70935e-5,  a:1.000000,  e0:0.016709,  ed:-1.151e-9,  M0:356.0470, Md:0.9856002585},
+    moon:    {N0:125.1228, Nd:-0.0529538083, i0:5.1454, id:0,         w0:318.0634, wd:0.1643573223,a:60.2666,   e0:0.054900,  ed:0,          M0:115.3654, Md:13.0649929509},
+    mercury: {N0:48.3313,  Nd:3.24587e-5,  i0:7.0047, id:5.00e-8,     w0:29.1241,  wd:1.01444e-5,  a:0.387098,  e0:0.205635,  ed:5.59e-10,   M0:168.6562, Md:4.0923344368},
+    venus:   {N0:76.6799,  Nd:2.46590e-5,  i0:3.3946, id:2.75e-8,     w0:54.8910,  wd:1.38374e-5,  a:0.723330,  e0:0.006773,  ed:-1.302e-9,  M0:48.0052,  Md:1.6021302244},
+    mars:    {N0:49.5574,  Nd:2.11081e-5,  i0:1.8497, id:-1.78e-8,    w0:286.5016, wd:2.92961e-5,  a:1.523688,  e0:0.093405,  ed:2.516e-9,   M0:18.6021,  Md:0.5240207766},
+    jupiter: {N0:100.4542, Nd:2.76854e-5,  i0:1.3030, id:-1.557e-7,   w0:273.8777, wd:1.64505e-5,  a:5.20256,   e0:0.048498,  ed:4.469e-9,   M0:19.8950,  Md:0.0830853001},
+    saturn:  {N0:113.6634, Nd:2.38980e-5,  i0:2.4886, id:-1.081e-7,   w0:339.3939, wd:2.97661e-5,  a:9.55475,   e0:0.055546,  ed:-9.499e-9,  M0:316.9670, Md:0.0334442282}
+  };
+
+  // days since 2000 Jan 0.0 UT
+  function dayNumber(date){
+    const y = date.getUTCFullYear(), m = date.getUTCMonth()+1, day = date.getUTCDate();
+    const hour = date.getUTCHours() + date.getUTCMinutes()/60 + date.getUTCSeconds()/3600;
+    return 367*y - Math.floor(7*(y + Math.floor((m+9)/12))/4) + Math.floor(275*m/9) + day - 730530 + hour/24;
+  }
+
+  function solveKepler(Mdeg, e){
+    let Mr = toRad(Mdeg);
+    let E = Mr + e*Math.sin(Mr)*(1 + e*Math.cos(Mr));
+    for(let n=0; n<12; n++){
+      const dE = (E - e*Math.sin(E) - Mr) / (1 - e*Math.cos(E));
+      E -= dE;
+      if(Math.abs(dE) < 1e-9) break;
+    }
+    return toDeg(E);
+  }
+
+  // returns heliocentric (or, for the sun/moon elements, geocentric) ecliptic coords + longitude
+  function orbitPosition(el, d){
+    const N = el.N0 + el.Nd*d;
+    const i = el.i0 + el.id*d;
+    const w = el.w0 + el.wd*d;
+    const e = el.e0 + el.ed*d;
+    const M = norm360(el.M0 + el.Md*d);
+    const E = solveKepler(M, e);
+    const Er = toRad(E);
+    const xv = el.a * (Math.cos(Er) - e);
+    const yv = el.a * (Math.sqrt(1-e*e) * Math.sin(Er));
+    const v = toDeg(Math.atan2(yv, xv));
+    const r = Math.sqrt(xv*xv + yv*yv);
+    const vw = toRad(v + w), Nr = toRad(N), ir = toRad(i);
+    const xh = r*(Math.cos(Nr)*Math.cos(vw) - Math.sin(Nr)*Math.sin(vw)*Math.cos(ir));
+    const yh = r*(Math.sin(Nr)*Math.cos(vw) + Math.cos(Nr)*Math.sin(vw)*Math.cos(ir));
+    const zh = r*(Math.sin(vw)*Math.sin(ir));
+    return { xh, yh, zh, r, lon: norm360(toDeg(Math.atan2(yh, xh))) };
+  }
+
+  function eclipticToEquatorial(x, y, z, d){
+    const ecl = toRad(23.4393 - 3.563e-7*d);
+    const xe = x;
+    const ye = y*Math.cos(ecl) - z*Math.sin(ecl);
+    const ze = y*Math.sin(ecl) + z*Math.cos(ecl);
+    const ra = norm360(toDeg(Math.atan2(ye, xe)));
+    const dec = toDeg(Math.atan2(ze, Math.sqrt(xe*xe + ye*ye)));
+    return { ra, dec };
+  }
+
+  function altitudeOf(ra, dec, lstDeg, latDeg){
+    let ha = norm360(lstDeg - ra);
+    if(ha > 180) ha -= 360;
+    const latR = toRad(latDeg), decR = toRad(dec), haR = toRad(ha);
+    const sinAlt = Math.sin(decR)*Math.sin(latR) + Math.cos(decR)*Math.cos(latR)*Math.cos(haR);
+    return toDeg(Math.asin(clamp(sinAlt, -1, 1)));
+  }
+
+  function computeSky(lat, lon, date){
+    const d = dayNumber(date);
+    const utHours = date.getUTCHours() + date.getUTCMinutes()/60 + date.getUTCSeconds()/3600;
+
+    const sun = orbitPosition(ELEMENTS.sun, d);      // geocentric already (Sun elements)
+    const gmst = norm360(sun.lon + 180 + utHours*15);
+    const lst = norm360(gmst + lon);
+
+    const sunEq = eclipticToEquatorial(sun.xh, sun.yh, sun.zh, d);
+    const sunAlt = altitudeOf(sunEq.ra, sunEq.dec, lst, lat);
+
+    // moon: elements are already geocentric
+    const moon = orbitPosition(ELEMENTS.moon, d);
+    const elongation = norm360(moon.lon - sun.lon);
+    const illumination = (1 - Math.cos(toRad(elongation))) / 2;
+
+    let phaseName;
+    if (elongation < 22.5 || elongation >= 337.5) phaseName = 'New Moon';
+    else if (elongation < 67.5) phaseName = 'Waxing Crescent';
+    else if (elongation < 112.5) phaseName = 'First Quarter';
+    else if (elongation < 157.5) phaseName = 'Waxing Gibbous';
+    else if (elongation < 202.5) phaseName = 'Full Moon';
+    else if (elongation < 247.5) phaseName = 'Waning Gibbous';
+    else if (elongation < 292.5) phaseName = 'Last Quarter';
+    else phaseName = 'Waning Crescent';
+
+    const planetNames = ['mercury','venus','mars','jupiter','saturn'];
+    const planets = planetNames.map(name => {
+      const helio = orbitPosition(ELEMENTS[name], d);
+      // geocentric = heliocentric(planet) - heliocentric(earth); heliocentric(earth) = -sun geocentric
+      const gx = helio.xh + sun.xh, gy = helio.yh + sun.yh, gz = helio.zh + sun.zh;
+      const eq = eclipticToEquatorial(gx, gy, gz, d);
+      const alt = altitudeOf(eq.ra, eq.dec, lst, lat);
+      return { name, alt };
+    });
+
+    return { sunAlt, elongation, illumination, phaseName, planets };
+  }
+
+  // Robust moon rendering: base circle + a lit-side clipped overlay.
+  // Avoids fragile hand-tuned arc math -- correctness matters more than
+  // a pixel-perfect terminator curve for a quick prototype.
+  function drawMoonIcon(svg, illumination, waxing){
+    const r = 46, cx = 50, cy = 50;
+    const dark = '#0f2032';
+    const lit = '#f4e9c9';
+
+    if (illumination <= 0.02){
+      svg.innerHTML = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${dark}" stroke="#3a5674" stroke-width="1.5"/>`;
+      return;
+    }
+    if (illumination >= 0.98){
+      svg.innerHTML = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${lit}"/>`;
+      return;
+    }
+
+    // Represent the lit portion as an ellipse (width scales with phase)
+    // unioned with, or subtracted from, one half of the circle -- this
+    // stays visually correct at every phase without relying on tricky
+    // arc sweep-flag math.
+    const half = illumination <= 0.5 ? 'crescent' : 'gibbous';
+    const ellipseRx = Math.abs(illumination - 0.5) * 2 * r; // 0 at quarter, r at new/full
+    const litOnRight = waxing;
+    const halfCirclePath = litOnRight
+      ? `M ${cx} ${cy-r} A ${r} ${r} 0 0 1 ${cx} ${cy+r} Z`   // right half
+      : `M ${cx} ${cy-r} A ${r} ${r} 0 0 0 ${cx} ${cy+r} Z`;  // left half
+
+    let overlay;
+    if (half === 'crescent'){
+      // thin lit sliver: half circle on the lit side, minus an ellipse bite
+      overlay = `
+        <clipPath id="halfClip"><path d="${halfCirclePath}"/></clipPath>
+        <g clip-path="url(#halfClip)">
+          <rect x="${cx-r}" y="${cy-r}" width="${r*2}" height="${r*2}" fill="${lit}"/>
+          <ellipse cx="${cx}" cy="${cy}" rx="${ellipseRx}" ry="${r}" fill="${dark}"/>
+        </g>`;
+    } else {
+      // gibbous: half circle on the lit side, plus an ellipse filling toward the far side
+      overlay = `
+        <ellipse cx="${cx}" cy="${cy}" rx="${ellipseRx}" ry="${r}" fill="${lit}"/>
+        <clipPath id="halfClip"><path d="${halfCirclePath}"/></clipPath>
+        <g clip-path="url(#halfClip)">
+          <rect x="${cx-r}" y="${cy-r}" width="${r*2}" height="${r*2}" fill="${lit}"/>
+        </g>`;
+    }
+
+    svg.innerHTML = `
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="${dark}" stroke="#3a5674" stroke-width="1.5"/>
+      ${overlay}
+    `;
+  }
+
+  // ================================================================
+  // WEATHER (Open-Meteo, no API key, entirely client-side fetch)
+  // ================================================================
+
+  let unit = 'c'; // 'c' or 'f'
+  let lastWeather = null;
+
+  function cToF(c){ return c * 9/5 + 32; }
+
+  function fmtTime(iso, tz){
+    const dt = new Date(iso);
+    return dt.toLocaleTimeString([], { hour:'numeric', minute:'2-digit' });
+  }
+  function fmtHour(iso){
+    const dt = new Date(iso);
+    return dt.toLocaleTimeString([], { hour:'numeric' });
+  }
+  function relTime(targetDate, now){
+    const ms = targetDate - now;
+    if (ms < 0) return 'just passed';
+    const mins = Math.round(ms/60000);
+    if (mins < 60) return `in ${mins} min`;
+    const hrs = Math.floor(mins/60);
+    const remMin = mins % 60;
+    return `in ${hrs}h ${remMin}m`;
+  }
+
+  async function fetchWeather(lat, lon){
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+      `&current=temperature_2m,weather_code` +
+      `&hourly=precipitation_probability,temperature_2m` +
+      `&daily=sunrise,sunset` +
+      `&forecast_days=2&timezone=auto`;
+    const res = await fetch(url);
+    if(!res.ok) throw new Error('Weather service error (' + res.status + ')');
+    return res.json();
+  }
+
+  function renderTemp(){
+    if(!lastWeather) return;
+    const c = lastWeather.current.temperature_2m;
+    const val = unit === 'c' ? c : cToF(c);
+    $('tempValue').innerHTML = Math.round(val) + '<small id="unitLabel">°' + unit.toUpperCase() + '</small>';
+    $('cBtn').classList.toggle('active', unit === 'c');
+    $('fBtn').classList.toggle('active', unit === 'f');
+  }
+
+  function renderRain(weather, now){
+    const times = weather.hourly.time;
+    const probs = weather.hourly.precipitation_probability;
+    const row = $('rainRow');
+    row.innerHTML = '';
+    let idx = times.findIndex(t => new Date(t) >= now);
+    if (idx < 0) idx = 0;
+    const slice = [];
+    for (let i = idx; i < Math.min(idx + 8, times.length); i++){
+      slice.push({ time: times[i], prob: probs[i] });
+    }
+    slice.forEach(h => {
+      const div = document.createElement('div');
+      div.className = 'rain-hour';
+      const low = h.prob < 30;
+      div.innerHTML = `<div class="t">${fmtHour(h.time)}</div><div class="p ${low?'low':''}">${h.prob}%</div>`;
+      row.appendChild(div);
+    });
+    const maxProb = Math.max(...slice.map(h => h.prob));
+    let summary;
+    if (maxProb >= 60) summary = `Rain likely in the next few hours — up to ${maxProb}% chance. Bring an umbrella.`;
+    else if (maxProb >= 30) summary = `Some chance of rain ahead — up to ${maxProb}%.`;
+    else summary = `Low chance of rain over the next few hours (peak ${maxProb}%).`;
+    $('rainSummary').textContent = summary;
+  }
+
+  function renderSun(weather, now){
+    const sunrises = weather.daily.sunrise.map(t => new Date(t));
+    const sunsets = weather.daily.sunset.map(t => new Date(t));
+    const nextSunrise = sunrises.find(t => t > now) || sunrises[sunrises.length-1];
+    const nextSunset = sunsets.find(t => t > now) || sunsets[sunsets.length-1];
+    $('sunriseValue').textContent = nextSunrise.toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
+    $('sunriseRel').textContent = relTime(nextSunrise, now);
+    $('sunsetValue').textContent = nextSunset.toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
+    $('sunsetRel').textContent = relTime(nextSunset, now);
+  }
+
+  function renderAstro(lat, lon, now){
+    const sky = computeSky(lat, lon, now);
+
+    $('moonPhaseName').textContent = sky.phaseName;
+    $('moonIllum').textContent = Math.round(sky.illumination*100) + '% illuminated';
+    const waxing = sky.elongation < 180;
+    drawMoonIcon($('moonIcon'), sky.illumination, waxing);
+
+    const list = $('planetList');
+    list.innerHTML = '';
+    const dark = sky.sunAlt < -6;
+    const label = { mercury:'Mercury', venus:'Venus', mars:'Mars', jupiter:'Jupiter', saturn:'Saturn' };
+
+    sky.planets.forEach(p => {
+      const div = document.createElement('div');
+      div.className = 'planet';
+      let tagClass, tagText;
+      if (p.alt <= 0){
+        tagClass = 'below'; tagText = 'Below horizon';
+      } else if (!dark){
+        tagClass = 'daylight'; tagText = 'Up, but daylight';
+      } else {
+        tagClass = 'visible'; tagText = 'Visible now';
+      }
+      div.innerHTML = `<span class="name">${label[p.name]}</span><span class="tag ${tagClass}">${tagText}</span>`;
+      list.appendChild(div);
+    });
+  }
+
+  async function loadAll(lat, lon, placeLabel){
+    setStatus('Loading weather and sky data…');
+    try{
+      const weather = await fetchWeather(lat, lon);
+      lastWeather = weather;
+      const now = new Date();
+
+      $('placeLabel').textContent = placeLabel || `${lat.toFixed(3)}, ${lon.toFixed(3)}`;
+      $('tempMeta').textContent = 'Updated ' + now.toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
+
+      renderTemp();
+      renderRain(weather, now);
+      renderSun(weather, now);
+      renderAstro(lat, lon, now);
+
+      showSections();
+      clearStatus();
+    } catch(err){
+      setStatus('Could not load data: ' + err.message, true);
+    }
+  }
+
+  // ---------- geolocation wiring ----------
+  function useGeolocation(){
+    if (!('geolocation' in navigator)){
+      setStatus('Geolocation is not supported in this browser. Search for your city below.', true);
+      $('manualForm').classList.add('show');
+      return;
+    }
+    setStatus('Requesting your location…');
+    $('locateBtn').disabled = true;
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        $('locateBtn').disabled = false;
+        loadAll(pos.coords.latitude, pos.coords.longitude, 'Your location');
+      },
+      err => {
+        $('locateBtn').disabled = false;
+        setStatus('Location access denied or unavailable (' + err.message + '). Search for your city below, or enter coordinates directly.', true);
+        $('manualForm').classList.add('show');
+      },
+      { enableHighAccuracy: false, timeout: 10000 }
+    );
+  }
+
+  // ---------- city search (Open-Meteo geocoding API, no key, client-side) ----------
+  async function searchCity(query){
+    const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=6&language=en&format=json`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Geocoding service error (' + res.status + ')');
+    const data = await res.json();
+    return data.results || [];
+  }
+
+  function renderCityResults(results){
+    const box = $('cityResults');
+    box.innerHTML = '';
+    if (results.length === 0){
+      $('cityHint').textContent = 'No matches found. Try a different spelling, or use coordinates instead.';
+      return;
+    }
+    $('cityHint').textContent = '';
+    results.forEach(r => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'city-result';
+      const region = [r.admin1, r.country].filter(Boolean).join(', ');
+      btn.innerHTML = `<div class="cr-place">${r.name}</div><div class="cr-detail">${region} · ${r.latitude.toFixed(2)}, ${r.longitude.toFixed(2)}</div>`;
+      btn.addEventListener('click', () => {
+        loadAll(r.latitude, r.longitude, `${r.name}${r.admin1 ? ', ' + r.admin1 : ''}`);
+      });
+      box.appendChild(btn);
+    });
+  }
+
+  async function runCitySearch(){
+    const q = $('cityInput').value.trim();
+    if (q.length < 2){
+      $('cityHint').textContent = 'Type at least 2 characters.';
+      return;
+    }
+    $('cityHint').textContent = 'Searching…';
+    $('cityResults').innerHTML = '';
+    try{
+      const results = await searchCity(q);
+      renderCityResults(results);
+    } catch(err){
+      $('cityHint').textContent = 'Search failed: ' + err.message;
+    }
+  }
+
+  function setManualMode(mode){
+    const isCity = mode === 'city';
+    $('modeCityBtn').classList.toggle('active', isCity);
+    $('modeCoordBtn').classList.toggle('active', !isCity);
+    $('cityPanel').classList.toggle('active', isCity);
+    $('coordPanel').classList.toggle('active', !isCity);
+  }
+
+  $('locateBtn').addEventListener('click', useGeolocation);
+  $('modeCityBtn').addEventListener('click', () => setManualMode('city'));
+  $('modeCoordBtn').addEventListener('click', () => setManualMode('coord'));
+  $('citySearchBtn').addEventListener('click', runCitySearch);
+  $('cityInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') runCitySearch(); });
+  $('manSubmit').addEventListener('click', () => {
+    const lat = parseFloat($('manLat').value);
+    const lon = parseFloat($('manLon').value);
+    if (Number.isNaN(lat) || Number.isNaN(lon)){
+      setStatus('Enter valid numeric latitude and longitude.', true);
+      return;
+    }
+    loadAll(lat, lon);
+  });
+  $('cBtn').addEventListener('click', () => { unit='c'; renderTemp(); });
+  $('fBtn').addEventListener('click', () => { unit='f'; renderTemp(); });
+
+  // auto-attempt on load
+  useGeolocation();
+
+})();
+</script>
+</body>
+</html>
